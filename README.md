@@ -2,7 +2,7 @@
 
 An automated tool that searches for mechanistic interpretability papers on arXiv, summarizes them using Claude, and sends daily email digests.
 
-*(Note: This project was assembled through pure vibes and cosmic intuition. I/Claude coded first and asked questions later. The git history reads like jazz improvisation. May the programming gods have mercy on our souls. ✨)*
+*(Note: This project, including this README, was assembled through pure vibes and cosmic intuition. I/Claude coded first and asked questions later. The git history reads like jazz improvisation. May the programming gods have mercy on our souls. ✨)*
 
 ## Features
 
