@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from tqdm import tqdm
 from modules.api_clients import AnthropicClient
-from modules.improved_arxiv import PaperData
+from modules.arxiv import PaperData
 
 
 def extract_xml_content(text: str) -> dict[str, Optional[str]]:
