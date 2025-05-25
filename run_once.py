@@ -60,61 +60,21 @@ def main():
         sender_email=sender_email
     )
     
-    # Get arXiv configuration
-    arxiv_config = config.get_arxiv_config()
+    # Fall back to the specialized interpretability search
+    print("Performing specialized interpretability search...")
+    specialized_results = arxiv_client.search_interpretability_papers(max_results=50)
     
-    # Test the improved arXiv client
-    print("Testing improved arXiv client...")
-    
-    # Test paper retrieval by ID
-    print("\nTest 1: Fetching a specific paper by ID")
-    test_paper = arxiv_client.get_paper_by_id("2304.14108")  # Monosemanticity paper
-    if test_paper:
-        print(f"✓ Successfully retrieved test paper: {test_paper.title}")
-        print(f"  PDF URL: {test_paper.pdf_url}")
-    else:
-        print("✗ Failed to retrieve test paper by ID")
-    
-    # Test search with specific terms and categories
-    print("\nTest 2: Searching for interpretability papers")
-    search_terms = config["search_terms"]
-    categories = config["categories"]
-    
-    print(f"Searching for: {search_terms} in categories: {categories}")
-    search_results = arxiv_client.search(
-        search_terms=search_terms,
-        categories=categories,
-        max_results=5
-    )
-    
-    if search_results:
-        print(f"✓ Found {len(search_results)} papers")
-        for i, paper in enumerate(search_results):
+    if specialized_results:
+        print(f"✓ Found {len(specialized_results)} papers with specialized search")
+        for i, paper in enumerate(specialized_results):
             print(f"  Paper {i+1}: {paper.title}")
             print(f"    Published: {paper.published}")
             print(f"    PDF URL: {paper.pdf_url}")
             print(f"    Categories: {paper.categories}")
             print()
-    else:
-        print("✗ No papers found with the specified criteria")
         
-        # Fall back to the specialized interpretability search
-        print("\nTrying specialized interpretability search...")
-        specialized_results = arxiv_client.search_interpretability_papers(max_results=5)
-        
-        if specialized_results:
-            print(f"✓ Found {len(specialized_results)} papers with specialized search")
-            for i, paper in enumerate(specialized_results):
-                print(f"  Paper {i+1}: {paper.title}")
-                print(f"    Published: {paper.published}")
-                print(f"    PDF URL: {paper.pdf_url}")
-                print(f"    Categories: {paper.categories}")
-                print()
-            
-            # Use these results for our test
-            search_results = specialized_results
-        else:
-            print("✗ No papers found with specialized search either")
+        # Use these results for our test
+        search_results = specialized_results
     
     # If we have search results, try to summarize them and send an email
     if search_results:
