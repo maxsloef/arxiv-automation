@@ -14,7 +14,7 @@ class Config:
         "llm_provider": "anthropic",
         
         # Model settings
-        "anthropic_model": "claude-2",
+        "anthropic_model": "claude-opus-4-20250514",
         "openai_model": "gpt-4",
         
         # Email settings reserved for future use
@@ -22,7 +22,7 @@ class Config:
         # arXiv search settings
         "search_terms": ["interpretability", "explainability", "xai"],
         "categories": ["cs.AI", "cs.LG", "cs.CL"],
-        "max_results": 5,
+        "max_results": 50,
         "days_back": 1,
         
         # Scheduler settings
