@@ -11,7 +11,6 @@ from modules.arxiv import ArxivClient
 from modules.api_clients import AnthropicClient, OpenAIClient
 from modules.summarizer import PaperSummarizer
 from modules.email_sender import EmailSender
-from modules.scheduler import PaperScheduler
 from config import Config
 
 def create_api_client(config):
