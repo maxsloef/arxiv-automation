@@ -1,115 +1,149 @@
-# arXiv Automation
+# arXiv Mechanistic Interpretability Papers
 
-A Python application that automatically retrieves papers related to AI interpretability from arXiv and sends daily email summaries.
+An automated tool that searches for mechanistic interpretability papers on arXiv, summarizes them using Claude, and sends daily email digests.
+
+*(Note: This project was assembled through pure vibes and cosmic intuition. I/Claude coded first and asked questions later. The git history reads like jazz improvisation. May the programming gods have mercy on our souls. ✨)*
 
 ## Features
 
-- Search for papers on arXiv using specific search terms and categories
-- Retrieve paper metadata including titles, authors, abstracts, and publication dates
-- Summarize papers using AI (Anthropic Claude or OpenAI GPT)
-- Send daily email digests with paper summaries and links
-- Configurable scheduling for automated retrieval
+- **Specialized Search**: Searches arXiv specifically for mechanistic interpretability papers in AI/ML categories
+- **Duplicate Detection**: Tracks previously seen papers to avoid sending duplicates
+- **AI Summarization**: Uses Anthropic's Claude to generate comprehensive summaries from paper PDFs
+- **Email Digests**: Sends well-formatted HTML emails with paper summaries via SendGrid
+- **GitHub Actions Integration**: Automated daily runs at 8:00 AM UTC
+- **Manual Execution**: Can be run on-demand for testing
+
+## How It Works
+
+1. Searches arXiv for papers containing "mechanistic interpretability" in CS.AI, CS.LG, and CS.CL categories
+2. Filters out previously seen papers (tracked in `seen_papers.json`)
+3. Downloads and analyzes PDFs using Claude to extract:
+   - Concise summary (250-300 words)
+   - Key methodologies
+   - Main contributions
+   - Notable limitations
+4. Sends an HTML-formatted email digest with all summaries
 
 ## Setup
 
 ### Prerequisites
 
-- Python 3.7+
-- API key for either Anthropic Claude or OpenAI
+- Python 3.11+
+- Anthropic API key (for Claude)
+- SendGrid API key (for email delivery)
+- GitHub repository (for automated runs)
 
 ### Installation
 
 1. Clone the repository:
-   ```
+   ```bash
    git clone https://github.com/yourusername/arxiv-automation.git
    cd arxiv-automation
    ```
 
 2. Create a virtual environment:
-   ```
+   ```bash
    python -m venv arxiv-env
+   source arxiv-env/bin/activate  # On Windows: arxiv-env\Scripts\activate
    ```
 
-3. Activate the virtual environment:
-   - On macOS/Linux:
-     ```
-     source arxiv-env/bin/activate
-     ```
-   - On Windows:
-     ```
-     arxiv-env\Scripts\activate
-     ```
-
-4. Install dependencies:
-   ```
+3. Install dependencies:
+   ```bash
    pip install -r requirements.txt
    ```
 
-5. Create a `.env` file in the project root with your sensitive configuration:
-   ```
-   # API Keys (choose one based on your preferred provider)
-   ANTHROPIC_API_KEY=your_anthropic_api_key
-   OPENAI_API_KEY=your_openai_api_key
+### GitHub Actions Setup
 
-   # SendGrid Email Configuration
-   SENDGRID_API_KEY=your_sendgrid_api_key
-   SENDER_EMAIL=your_email@example.com
-   RECIPIENT_EMAIL=recipient@example.com
-   ```
+1. Go to your repository Settings → Secrets and variables → Actions
+2. Add the following secrets:
+   - `ANTHROPIC_API_KEY`
+   - `SENDGRID_API_KEY`
+   - `SENDER_EMAIL`
+   - `RECIPIENT_EMAIL`
 
-6. Configure settings in `config.json` if needed (default values are provided).
+3. The workflow will run automatically at 8:00 AM UTC daily, or can be triggered manually from the Actions tab
 
 ## Usage
 
-### Running the Application
+### Manual Run (Testing)
 
+```bash
+python run_once.py
 ```
-python app.py
-```
 
-This will start the scheduler, which will run at the configured time (default: 8:00 AM) to fetch papers, generate summaries, and send an email digest.
+This will:
+- Search for up to 50 recent mechanistic interpretability papers
+- Generate summaries for any new papers found
+- Send an email to the configured recipient
+- Update `seen_papers.json` to track processed papers
 
-### Configuration
+### Automated Daily Runs
 
-The application can be configured through the `config.json` file:
+The GitHub Actions workflow (`.github/workflows/daily-arxiv.yml`) handles:
+- Daily execution at 8:00 AM UTC
+- Automatic commit of `seen_papers.json` to track processed papers
+- Environment variable management from GitHub Secrets
+
+## Configuration
+
+Edit `config.json` to customize:
 
 ```json
 {
   "llm_provider": "anthropic",
-  "anthropic_model": "claude-2",
-  "openai_model": "gpt-4",
-  "search_terms": ["interpretability", "explainability", "xai"],
-  "categories": ["cs.AI", "cs.LG", "cs.CL"],
-  "max_results": 5,
-  "days_back": 1,
-  "run_time": "08:00",
-  "run_immediately": false
+  "anthropic_model": "claude-opus-4-20250514",
+  "max_results": 50,
+  "days_back": 1
 }
 ```
 
-- `llm_provider`: Choose between "anthropic" or "openai"
-- `anthropic_model`/`openai_model`: Model to use for summarization
-- `search_terms`: List of terms to search for on arXiv
-- `categories`: List of arXiv categories to search in
-- `max_results`: Maximum number of papers to retrieve
-- `days_back`: Number of days to look back for papers
-- `run_time`: Time to run the job daily (HH:MM format)
-- `run_immediately`: Whether to run the job immediately on startup
+Note: The search query is hardcoded for mechanistic interpretability papers. To modify the search terms, edit the `search_interpretability_papers` method in `modules/arxiv.py`.
 
-## Structure
+## Project Structure
 
-- `app.py`: Main application entry point
-- `config.py`: Configuration handling
-- `modules/`: Core functionality modules
-  - `arxiv_client.py`: Client for interacting with the arXiv API
-  - `api_clients.py`: Clients for AI providers (Anthropic, OpenAI)
-  - `summarizer.py`: Paper summarization functionality
-  - `email_sender.py`: Email generation and sending
-  - `scheduler.py`: Scheduling of paper retrieval and notifications
+```
+├── modules/              # Core functionality
+│   ├── arxiv.py         # arXiv API client with deduplication
+│   ├── api_clients.py   # Anthropic Claude client
+│   ├── summarizer.py    # PDF analysis and summarization
+│   └── email_sender.py  # SendGrid email formatting/sending
+├── run_once.py          # Manual execution script
+├── config.py            # Configuration management
+├── seen_papers.json     # Tracking file for processed papers
+├── requirements.txt     # Python dependencies
+├── .env.example         # Environment variables template
+└── .github/
+    └── workflows/
+        └── daily-arxiv.yml  # GitHub Actions workflow
+```
+
+## How Summarization Works
+
+The tool sends paper PDFs directly to Claude using Anthropic's document analysis capabilities. For each paper, Claude extracts:
+
+- **Summary**: A comprehensive 250-300 word overview focusing on interpretability aspects
+- **Methods**: Key methodologies and techniques used
+- **Contributions**: Main contributions to the field
+- **Limitations**: Any notable limitations mentioned by the authors
+
+## Troubleshooting
+
+**No papers found**: 
+- The tool searches specifically for "mechanistic interpretability" papers
+- Check if there are new papers in the last day matching this criteria
+- Review `seen_papers.json` - you may need to clear it to reprocess papers
+
+**Email not sending**:
+- Verify SendGrid API key and email addresses in `.env`
+- Check SendGrid account status and sending limits
+- Ensure sender email is verified in SendGrid
+
+**GitHub Actions failing**:
+- Check that all required secrets are set in repository settings
+- Review the Actions log for specific error messages
+- Ensure `seen_papers.json` can be committed (check branch protection rules)
 
 ## Notes
 
-- The application uses SendGrid for sending emails - you'll need a SendGrid API key
-- The application respects arXiv's rate limiting by adding delays between requests
-- AI models have token limits, so very large papers may encounter issues with summarization
-- The email is sent as both HTML and plain text, with the HTML version offering better formatting
+- Only new papers are processed - previously seen papers are skipped
+- The `seen_papers.json` file is automatically maintained and committed by GitHub Actions
