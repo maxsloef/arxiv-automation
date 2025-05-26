@@ -1,11 +1,13 @@
 """Module for sending email notifications with paper summaries using SendGrid."""
 
-import os
-from typing import List, Optional
+import html
+from typing import List
 from modules.summarizer import PaperData
 
 class EmailSender:
     """Class for sending email notifications with paper summaries using SendGrid."""
+
+    MAX_EMAIL_SIZE = 10 * 1024 * 1024  # 10MB limit
     
     def __init__(self, api_key: str, sender_email: str):
         """
@@ -17,17 +19,25 @@ class EmailSender:
         """
         self.api_key = api_key
         self.sender_email = sender_email
+
+    def _escape_html(self, text: str) -> str:
+        """Safely escape HTML content."""
+        return html.escape(text) if text else ""
+    
+    def _escape_url(self, url: str) -> str:
+        """Safely escape URL for href attribute."""
+        if not url:
+            return "#"
+        
+        # Basic validation - ensure it's an arxiv URL
+        if not url.startswith(('http://arxiv.org', 'https://arxiv.org')):
+            return "#"
+        
+        # HTML escape the URL to prevent attribute breaking
+        return html.escape(url, quote=True)
         
     def _create_html_content(self, paper_summaries: List[PaperData]) -> str:
-        """
-        Create HTML content from paper summaries.
-        
-        Args:
-            paper_summaries: List of paper summaries
-            
-        Returns:
-            HTML content as a string
-        """
+        """Create HTML content with proper escaping."""
         html = """
         <html>
         <head>
@@ -50,25 +60,27 @@ class EmailSender:
         for paper in paper_summaries:
             html += f"""
             <div class="paper">
-                <div class="title">{paper.title}</div>
+                <div class="title">{self._escape_html(paper.title)}</div>
             """
             
             if paper.authors:
-                authors_str = ", ".join(paper.authors)
+                # Escape each author name individually
+                escaped_authors = [self._escape_html(author) for author in paper.authors]
+                authors_str = ", ".join(escaped_authors)
                 html += f'<div class="authors">Authors: {authors_str}</div>'
                 
             if paper.published:
-                html += f'<div class="published">Published: {paper.published}</div>'
+                html += f'<div class="published">Published: {self._escape_html(paper.published)}</div>'
                 
             html += f"""
-                <div class="summary">{paper.summary}</div>
-                <div><a class="link" href="{paper.url}" target="_blank">Read Paper</a></div>
+                <div class="summary">{self._escape_html(paper.summary)}</div>
+                <div><a class="link" href="{self._escape_url(paper.url)}" target="_blank">Read Paper</a></div>
             """
             
             if paper.keywords:
                 html += '<div class="keywords">'
                 for keyword in paper.keywords:
-                    html += f'<span class="keyword">{keyword}</span>'
+                    html += f'<span class="keyword">{self._escape_html(keyword)}</span>'
                 html += '</div>'
                 
             html += '</div>'
