@@ -75,6 +75,9 @@ def main():
         
         # Use these results for our test
         search_results = specialized_results
+    else:
+        # Initialize search_results as empty list when no papers found
+        search_results = []
     
     # If we have search results, try to summarize them and send an email
     if search_results:
