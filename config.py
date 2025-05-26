@@ -24,6 +24,9 @@ class Config:
         "categories": ["cs.AI", "cs.LG", "cs.CL"],
         "max_results": 50,
         
+        # Cache settings
+        "cache_dir": "paper_cache",
+        
         # Scheduler settings
         "run_time": "08:00",
     }
@@ -93,6 +96,7 @@ class Config:
             "search_terms": self.config["search_terms"],
             "categories": self.config["categories"],
             "max_results": self.config["max_results"],
+            "cache_dir": self.config["cache_dir"],
         }
     
     def get_scheduler_config(self) -> Dict:
