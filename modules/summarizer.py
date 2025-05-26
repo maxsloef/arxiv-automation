@@ -1,34 +1,37 @@
+import logging
 import re
-from typing import List, Optional
+import time
+import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Dict, List, Optional
 
 from tqdm import tqdm
 from modules.api_clients import AnthropicClient
 from modules.arxiv import PaperData
 
 
-def extract_xml_content(text: str) -> dict[str, Optional[str]]:
-    """
-    Extract content between specific XML tags from LLM output.
-    
-    Args:
-        text (str): The input text containing XML tags
-        
-    Returns:
-        Dict[str, Optional[str]]: Dictionary with tag names as keys and content as values
-    """
+def extract_xml_content(text: str) -> Dict[str, Optional[str]]:
+    """Extract content using proper XML parsing."""
     tags = ['summary', 'methods', 'contributions', 'limitations']
-    results = {}
+    results = {tag: None for tag in tags}
     
-    for tag in tags:
-        # Create regex pattern to match content between opening and closing tags
-        pattern = f'<{tag}>(.*?)</{tag}>'
-        match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
-        
-        if match:
-            # Strip whitespace and store the content
-            results[tag] = match.group(1).strip()
-        else:
-            results[tag] = None
+    # Wrap in root element for valid XML
+    wrapped = f"<root>{text}</root>"
+    
+    try:
+        root = ET.fromstring(wrapped)
+        for tag in tags:
+            element = root.find(f".//{tag}")
+            if element is not None and element.text:
+                results[tag] = element.text.strip()
+    except ET.ParseError as e:
+        logging.warning(f"XML parsing failed, falling back to regex: {e}")
+        # Fallback to regex if needed
+        for tag in tags:
+            pattern = f'<{tag}>(.*?)</{tag}>'
+            match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
+            if match:
+                results[tag] = match.group(1).strip()
     
     return results
 
@@ -89,32 +92,36 @@ class PaperSummarizer:
         Plan your response outside of the XML tags before writing the final output.
         """
 
-    def summarize_paper(self, pdf_url: str) -> str:
-        """
-        Summarize a single paper given its PDF URL.
+    def summarize_papers(self, papers: List[PaperData], max_workers: int = 3) -> List[PaperData]:
+        """Summarize papers concurrently with proper error handling."""
+        summarized_papers = []
         
-        Args:
-            pdf_url (str): URL to the paper's PDF.
-        
-        Returns:
-            str: HTML formatted summary of the paper.
-        """
-        # Generate prompt for the AI model
-        prompt = self._generate_summary_prompt()
-        
-        # Check if the prompt is too large
-        if len(prompt.encode('utf-8')) > self.MAX_REQ_BYTES:
-            raise ValueError("Prompt exceeds maximum request size.")
-        
-        # Send request to the AI model with PDF URL
-        response = self._client.send_request(
-            prompt=prompt, 
-            pdf_url=pdf_url,
-            max_tokens_to_sample=5000
-        )
-
-        processed_response = extract_xml_content(response)
-        return format_summary_html(processed_response)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_paper = {
+                executor.submit(self._summarize_with_retry, paper): paper 
+                for paper in papers if paper.pdf_url
+            }
+            
+            for future in tqdm(as_completed(future_to_paper), total=len(future_to_paper)):
+                paper = future_to_paper[future]
+                try:
+                    summary = future.result()
+                    paper.summary = summary
+                    summarized_papers.append(paper)
+                except Exception as e:
+                    logging.error(f"Failed to summarize {paper.id}: {e}")
+                    
+        return summarized_papers
+    
+    def _summarize_with_retry(self, paper: PaperData, max_retries: int = 2) -> str:
+        """Summarize with retry logic."""
+        for attempt in range(max_retries + 1):
+            try:
+                return self.summarize_paper(paper.pdf_url)
+            except Exception as e:
+                if attempt == max_retries:
+                    raise
+                time.sleep(2 ** attempt)  # Exponential backoff
     
     def summarize_papers(self, papers: List[PaperData]) -> List[PaperData]:
         """
