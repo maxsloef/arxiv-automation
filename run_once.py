@@ -14,6 +14,14 @@ from config import Config
 
 def main():
     """Run the arXiv paper automation once."""
+    # Check if today is a weekday (Monday=0, Sunday=6)
+    today = datetime.now()
+    if today.weekday() >= 5:  # Saturday=5, Sunday=6
+        print(f"Skipping execution - today is {today.strftime('%A')} (weekend)")
+        return
+    
+    print(f"Running on {today.strftime('%A, %B %d, %Y')}")
+    
     # Load environment variables from .env file if it exists
     load_dotenv()
     

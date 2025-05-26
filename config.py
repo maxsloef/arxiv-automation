@@ -28,7 +28,7 @@ class Config:
         "cache_dir": "paper_cache",
         
         # Scheduler settings
-        "run_time": "08:00",
+        "run_time": "16:00",
     }
     
     # Path to config file

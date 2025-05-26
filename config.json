@@ -3,7 +3,7 @@
   "anthropic_model": "claude-opus-4-20250514",
   "search_terms": ["interpretability", "mechanistic interpretability"],
   "categories": ["cs.AI", "cs.LG", "cs.CL"],
-  "max_results": 50,
+  "max_results": 5,
   "cache_dir": "paper_cache",
-  "run_time": "08:00"
+  "run_time": "16:00"
 }
