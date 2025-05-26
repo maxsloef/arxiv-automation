@@ -60,12 +60,17 @@ def main():
         sender_email=sender_email
     )
     
-    # Fall back to the specialized interpretability search
-    print("Performing specialized interpretability search...")
-    specialized_results = arxiv_client.search_interpretability_papers(max_results=50)
+    # Get search configuration and perform search
+    arxiv_config = config.get_arxiv_config()
+    print(f"Performing search with terms: {arxiv_config['search_terms']} in categories: {arxiv_config['categories']}")
+    specialized_results = arxiv_client.search_papers(
+        search_terms=arxiv_config['search_terms'],
+        categories=arxiv_config['categories'],
+        max_results=arxiv_config['max_results']
+    )
     
     if specialized_results:
-        print(f"✓ Found {len(specialized_results)} papers with specialized search")
+        print(f"✓ Found {len(specialized_results)} papers with search")
         for i, paper in enumerate(specialized_results):
             print(f"  Paper {i+1}: {paper.title}")
             print(f"    Published: {paper.published}")
@@ -90,7 +95,7 @@ def main():
             # Try to send an email with the summaries
             print(f"\nSending email to {recipient_email}...")
             today = datetime.now().strftime("%Y-%m-%d")
-            subject = f"arXiv Interpretability Papers ({today})"
+            subject = f"arXiv Papers ({today})"
             
             email_success = email_sender.send_email(
                 recipient_email=recipient_email,

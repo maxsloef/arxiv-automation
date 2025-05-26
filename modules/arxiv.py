@@ -69,12 +69,60 @@ class ArxivClient:
                 self.seen_papers[paper.id] = current_date
         self._save_seen_papers()
     
-    def search_interpretability_papers(self, max_results: int = 10, request_size: int = 20, timeout_seconds: float = 1.0) -> List[PaperData]:
+    def _construct_query(self, search_terms: Optional[List[str]] = None, categories: Optional[List[str]] = None) -> str:
         """
-        Search for interpretability papers, making individual requests and checking for duplicates.
+        Construct an arXiv query string with proper URL encoding.
+        
+        Args:
+            search_terms: List of search terms to search for
+            categories: List of arXiv categories (e.g., ['cs.AI', 'cs.LG'])
+            
+        Returns:
+            str: Properly formatted query string for arXiv API
+        """
+        query_parts = []
+        
+        # Add categories with OR between them
+        if categories:
+            if len(categories) > 1:
+                cats = " OR ".join([f"cat:{cat}" for cat in categories])
+                query_parts.append(f"({cats})")
+            else:
+                query_parts.append(f"cat:{categories[0]}")
+        
+        # Add search terms with proper encoding
+        if search_terms:
+            if len(search_terms) > 1:
+                # For multiple terms, use OR and encode quotes as %22
+                encoded_terms = []
+                for term in search_terms:
+                    if " " in term:  # Multi-word terms need quotes
+                        encoded_terms.append(f'%22{term}%22')
+                    else:
+                        encoded_terms.append(term)
+                terms_str = " OR ".join(encoded_terms)
+                query_parts.append(f"({terms_str})")
+            else:
+                # Single term
+                term = search_terms[0]
+                if " " in term:  # Multi-word term needs quotes
+                    query_parts.append(f'%22{term}%22')
+                else:
+                    query_parts.append(term)
+        
+        # Join query parts with AND
+        return " AND ".join(query_parts) if query_parts else ""
+    
+    def search_papers(self, search_terms: Optional[List[str]] = None, categories: Optional[List[str]] = None, 
+                     max_results: int = 10, request_size: int = 20, timeout_seconds: float = 1.0) -> List[PaperData]:
+        """
+        Generic search for papers with configurable terms and categories.
+        Makes individual requests and checks for duplicates.
         Continues until we have enough new papers or exhaust the search space.
         
         Args:
+            search_terms: List of search terms to search for
+            categories: List of arXiv categories (e.g., ['cs.AI', 'cs.LG'])
             max_results: Maximum number of new papers to return
             request_size: Number of papers to fetch in each request to arXiv
             timeout_seconds: Time to wait between requests to be polite to arXiv
@@ -84,8 +132,12 @@ class ArxivClient:
         """
         import time
         
-        # Pre-crafted query for interpretability papers
-        query = "(cat:cs.AI OR cat:cs.LG OR cat:cs.CL) AND %22mechanistic interpretability%22"
+        # Construct the query
+        query = self._construct_query(search_terms, categories)
+        if not query:
+            print("No search terms or categories provided")
+            return []
+            
         print(f"Searching arXiv with query: {query}")
         
         found_papers = []
@@ -164,6 +216,28 @@ class ArxivClient:
         self.mark_papers_as_seen(found_papers)
         
         return found_papers
+    
+    def search_interpretability_papers(self, max_results: int = 10, request_size: int = 20, timeout_seconds: float = 1.0) -> List[PaperData]:
+        """
+        Search for interpretability papers, making individual requests and checking for duplicates.
+        Continues until we have enough new papers or exhaust the search space.
+        
+        Args:
+            max_results: Maximum number of new papers to return
+            request_size: Number of papers to fetch in each request to arXiv
+            timeout_seconds: Time to wait between requests to be polite to arXiv
+            
+        Returns:
+            List[PaperData]: List of paper data objects
+        """
+        # Use the generic search function with interpretability-specific terms
+        return self.search_papers(
+            search_terms=["mechanistic interpretability"],
+            categories=["cs.AI", "cs.LG", "cs.CL"],
+            max_results=max_results,
+            request_size=request_size,
+            timeout_seconds=timeout_seconds
+        )
     
     def search(self, search_terms=None, categories=None, max_results=10):
         """
@@ -277,7 +351,8 @@ class ArxivClient:
             str: The URL to the PDF
         """
         paper = self.get_paper_by_id(paper_id)
-        return paper.pdf_url
+        if paper and paper.pdf_url:
+            return paper.pdf_url
         
         raise ValueError(f"Paper with ID {paper_id} not found or has no PDF URL.")
     
