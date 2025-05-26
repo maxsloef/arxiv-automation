@@ -35,6 +35,7 @@ def extract_xml_content(text: str) -> Dict[str, Optional[str]]:
     
     return results
 
+
 def format_summary_html(results: dict[str, Optional[str]]) -> str:
     """
     Format the extracted XML content into HTML.
@@ -92,26 +93,32 @@ class PaperSummarizer:
         Plan your response outside of the XML tags before writing the final output.
         """
 
-    def summarize_papers(self, papers: List[PaperData], max_workers: int = 3) -> List[PaperData]:
-        """Summarize papers concurrently with proper error handling."""
-        summarized_papers = []
+    def summarize_paper(self, pdf_url: str) -> str:
+        """
+        Summarize a single paper given its PDF URL.
         
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_paper = {
-                executor.submit(self._summarize_with_retry, paper): paper 
-                for paper in papers if paper.pdf_url
-            }
-            
-            for future in tqdm(as_completed(future_to_paper), total=len(future_to_paper)):
-                paper = future_to_paper[future]
-                try:
-                    summary = future.result()
-                    paper.summary = summary
-                    summarized_papers.append(paper)
-                except Exception as e:
-                    logging.error(f"Failed to summarize {paper.id}: {e}")
-                    
-        return summarized_papers
+        Args:
+            pdf_url (str): URL to the paper's PDF.
+        
+        Returns:
+            str: HTML formatted summary of the paper.
+        """
+        # Generate prompt for the AI model
+        prompt = self._generate_summary_prompt()
+        
+        # Check if the prompt is too large
+        if len(prompt.encode('utf-8')) > self.MAX_REQ_BYTES:
+            raise ValueError("Prompt exceeds maximum request size.")
+        
+        # Send request to the AI model with PDF URL
+        response = self._client.send_request(
+            prompt=prompt, 
+            pdf_url=pdf_url,
+            max_tokens_to_sample=5000
+        )
+
+        processed_response = extract_xml_content(response)
+        return format_summary_html(processed_response)
     
     def _summarize_with_retry(self, paper: PaperData, max_retries: int = 2) -> str:
         """Summarize with retry logic."""
@@ -122,13 +129,14 @@ class PaperSummarizer:
                 if attempt == max_retries:
                     raise
                 time.sleep(2 ** attempt)  # Exponential backoff
-    
-    def summarize_papers(self, papers: List[PaperData]) -> List[PaperData]:
+
+    def summarize_papers(self, papers: List[PaperData], max_workers: int = 3) -> List[PaperData]:
         """
-        Summarize multiple papers, using cache when available.
+        Summarize multiple papers concurrently with caching support.
         
         Args:
             papers (List[PaperData]): List of paper data objects.
+            max_workers (int): Maximum number of concurrent workers.
         
         Returns:
             List[PaperData]: List of papers with summaries added.
@@ -138,11 +146,11 @@ class PaperSummarizer:
         
         # First pass: check cache for existing summaries
         for paper in papers:
-            if self._arxiv_client and self._arxiv_client.is_paper_cached(paper.id):
+            if self._arxiv_client and hasattr(self._arxiv_client, 'is_paper_cached') and self._arxiv_client.is_paper_cached(paper.id):
                 # Load from cache
                 cached_paper = self._arxiv_client.load_paper_from_cache(paper.id)
                 if cached_paper and cached_paper.summary:
-                    print(f"Using cached summary for paper {paper.id}")
+                    logging.info(f"Using cached summary for paper {paper.id}")
                     summarized_papers.append(cached_paper)
                     continue
             
@@ -150,20 +158,28 @@ class PaperSummarizer:
             if paper.pdf_url:
                 papers_to_summarize.append(paper)
             else:
-                print(f"Skipping paper {paper.id} - no PDF URL")
+                logging.warning(f"Skipping paper {paper.id} - no PDF URL")
         
-        # Second pass: summarize papers not in cache
-        for paper in tqdm(papers_to_summarize, desc="Summarizing papers", unit="paper"):
-            try:
-                summary = self.summarize_paper(paper.pdf_url)
-                paper.summary = summary
-                summarized_papers.append(paper)
+        # Second pass: summarize papers not in cache (with concurrency)
+        if papers_to_summarize:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_to_paper = {
+                    executor.submit(self._summarize_with_retry, paper): paper 
+                    for paper in papers_to_summarize
+                }
                 
-                # Cache the paper with summary
-                if self._arxiv_client:
-                    self._arxiv_client.save_paper_to_cache(paper)
-                    
-            except Exception as e:
-                print(f"Error summarizing paper {paper.id}: {e}")
-                
+                for future in tqdm(as_completed(future_to_paper), total=len(future_to_paper), desc="Summarizing papers"):
+                    paper = future_to_paper[future]
+                    try:
+                        summary = future.result()
+                        paper.summary = summary
+                        summarized_papers.append(paper)
+                        
+                        # Cache the paper with summary
+                        if self._arxiv_client and hasattr(self._arxiv_client, 'save_paper_to_cache'):
+                            self._arxiv_client.save_paper_to_cache(paper)
+                            
+                    except Exception as e:
+                        logging.error(f"Failed to summarize {paper.id}: {e}")
+                        
         return summarized_papers
