@@ -21,16 +21,40 @@ class PaperData:
     keywords: Optional[List[str]] = None
     summary: Optional[str] = None
     categories: Optional[List[str]] = None
+    
+    def to_dict(self) -> Dict:
+        """Convert PaperData to dictionary for JSON serialization."""
+        return {
+            'id': self.id,
+            'title': self.title,
+            'url': self.url,
+            'pdf_url': self.pdf_url,
+            'doi': self.doi,
+            'comment': self.comment,
+            'published': self.published,
+            'authors': self.authors,
+            'abstract': self.abstract,
+            'keywords': self.keywords,
+            'summary': self.summary,
+            'categories': self.categories
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict) -> 'PaperData':
+        """Create PaperData from dictionary."""
+        return cls(**data)
 
 class ArxivClient:
     """A client for interacting with the arXiv API with paper tracking."""
     
     SEEN_PAPERS_FILE = "seen_papers.json"
     
-    def __init__(self):
+    def __init__(self, cache_dir: str = "paper_cache"):
         """Initialize the arXiv client."""
         self.client = arxiv.Client()
         self.seen_papers = self._load_seen_papers()
+        self.cache_dir = cache_dir
+        self._ensure_cache_dir()
     
     def _load_seen_papers(self) -> Dict[str, str]:
         """
@@ -68,6 +92,44 @@ class ArxivClient:
             if paper:
                 self.seen_papers[paper.id] = current_date
         self._save_seen_papers()
+    
+    def _ensure_cache_dir(self):
+        """Ensure the cache directory exists."""
+        from pathlib import Path
+        Path(self.cache_dir).mkdir(exist_ok=True)
+    
+    def _get_cache_path(self, paper_id: str) -> str:
+        """Get the cache file path for a paper ID."""
+        return os.path.join(self.cache_dir, f"{paper_id}.json")
+    
+    def save_paper_to_cache(self, paper: PaperData):
+        """Save a PaperData object to cache."""
+        try:
+            cache_path = self._get_cache_path(paper.id)
+            with open(cache_path, 'w') as f:
+                json.dump(paper.to_dict(), f, indent=2)
+            print(f"Cached paper: {paper.id}")
+        except Exception as e:
+            print(f"Warning: Unable to cache paper {paper.id}: {e}")
+    
+    def load_paper_from_cache(self, paper_id: str) -> Optional[PaperData]:
+        """Load a PaperData object from cache if it exists."""
+        try:
+            cache_path = self._get_cache_path(paper_id)
+            if os.path.exists(cache_path):
+                with open(cache_path, 'r') as f:
+                    data = json.load(f)
+                paper = PaperData.from_dict(data)
+                print(f"Loaded paper from cache: {paper_id}")
+                return paper
+        except Exception as e:
+            print(f"Warning: Unable to load paper {paper_id} from cache: {e}")
+        return None
+    
+    def is_paper_cached(self, paper_id: str) -> bool:
+        """Check if a paper is cached."""
+        cache_path = self._get_cache_path(paper_id)
+        return os.path.exists(cache_path)
     
     def _construct_query(self, search_terms: Optional[List[str]] = None, categories: Optional[List[str]] = None) -> str:
         """

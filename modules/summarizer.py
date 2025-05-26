@@ -57,8 +57,9 @@ class PaperSummarizer:
     MAX_REQ_BYTES = 32 * 1000000  # 32MB
     MAX_REQ_PAGES = 100
 
-    def __init__(self, client: AnthropicClient):
+    def __init__(self, client: AnthropicClient, arxiv_client=None):
         self._client = client
+        self._arxiv_client = arxiv_client
 
     def _generate_summary_prompt(self) -> str:
         """
@@ -117,7 +118,7 @@ class PaperSummarizer:
     
     def summarize_papers(self, papers: List[PaperData]) -> List[PaperData]:
         """
-        Summarize multiple papers.
+        Summarize multiple papers, using cache when available.
         
         Args:
             papers (List[PaperData]): List of paper data objects.
@@ -126,14 +127,35 @@ class PaperSummarizer:
             List[PaperData]: List of papers with summaries added.
         """
         summarized_papers = []
-        for paper in tqdm(papers, desc="Summarizing papers", unit="paper"):
+        papers_to_summarize = []
+        
+        # First pass: check cache for existing summaries
+        for paper in papers:
+            if self._arxiv_client and self._arxiv_client.is_paper_cached(paper.id):
+                # Load from cache
+                cached_paper = self._arxiv_client.load_paper_from_cache(paper.id)
+                if cached_paper and cached_paper.summary:
+                    print(f"Using cached summary for paper {paper.id}")
+                    summarized_papers.append(cached_paper)
+                    continue
+            
+            # Paper needs to be summarized
+            if paper.pdf_url:
+                papers_to_summarize.append(paper)
+            else:
+                print(f"Skipping paper {paper.id} - no PDF URL")
+        
+        # Second pass: summarize papers not in cache
+        for paper in tqdm(papers_to_summarize, desc="Summarizing papers", unit="paper"):
             try:
-                if paper.pdf_url:
-                    summary = self.summarize_paper(paper.pdf_url)
-                    paper.summary = summary
-                    summarized_papers.append(paper)
-                else:
-                    print(f"Skipping paper {paper.id} - no PDF URL")
+                summary = self.summarize_paper(paper.pdf_url)
+                paper.summary = summary
+                summarized_papers.append(paper)
+                
+                # Cache the paper with summary
+                if self._arxiv_client:
+                    self._arxiv_client.save_paper_to_cache(paper)
+                    
             except Exception as e:
                 print(f"Error summarizing paper {paper.id}: {e}")
                 

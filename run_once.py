@@ -20,8 +20,11 @@ def main():
     # Create configuration
     config = Config()
     
-    # Create ArXiv client using the improved client
-    arxiv_client = ArxivClient()
+    # Get arxiv configuration including cache settings
+    arxiv_config = config.get_arxiv_config()
+    
+    # Create ArXiv client using the improved client with cache
+    arxiv_client = ArxivClient(cache_dir=arxiv_config['cache_dir'])
     
     # Create Anthropic API client
     api_config = config.get_api_config()
@@ -35,8 +38,8 @@ def main():
     api_client = AnthropicClient(api_config["model"], api_config["api_key"])
     llm_provider = "anthropic"  # Hardcode to anthropic
     
-    # Create paper summarizer
-    summarizer = PaperSummarizer(api_client)
+    # Create paper summarizer with cache support
+    summarizer = PaperSummarizer(api_client, arxiv_client)
     
     # Create email sender
     sendgrid_api_key = os.environ.get("SENDGRID_API_KEY")
@@ -61,7 +64,6 @@ def main():
     )
     
     # Get search configuration and perform search
-    arxiv_config = config.get_arxiv_config()
     print(f"Performing search with terms: {arxiv_config['search_terms']} in categories: {arxiv_config['categories']}")
     specialized_results = arxiv_client.search_papers(
         search_terms=arxiv_config['search_terms'],
