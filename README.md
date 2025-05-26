@@ -93,7 +93,6 @@ Edit `config.json` to customize:
   "llm_provider": "anthropic",
   "anthropic_model": "claude-opus-4-20250514",
   "max_results": 50,
-  "days_back": 1
 }
 ```
 

@@ -23,11 +23,9 @@ class Config:
         "search_terms": ["interpretability", "explainability", "xai"],
         "categories": ["cs.AI", "cs.LG", "cs.CL"],
         "max_results": 50,
-        "days_back": 1,
         
         # Scheduler settings
         "run_time": "08:00",
-        "run_immediately": False
     }
     
     # Path to config file
@@ -95,14 +93,12 @@ class Config:
             "search_terms": self.config["search_terms"],
             "categories": self.config["categories"],
             "max_results": self.config["max_results"],
-            "days_back": self.config["days_back"]
         }
     
     def get_scheduler_config(self) -> Dict:
         """Get scheduler configuration."""
         return {
             "run_time": self.config["run_time"],
-            "run_immediately": self.config["run_immediately"]
         }
     
     def update(self, new_config: Dict[str, Any]) -> None:

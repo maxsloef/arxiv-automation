@@ -1,0 +1,8 @@
+{
+  "llm_provider": "anthropic",
+  "anthropic_model": "claude-opus-4-20250514",
+  "search_terms": ["interpretability", "mechanistic interpretability"],
+  "categories": ["cs.AI", "cs.LG", "cs.CL"],
+  "max_results": 3,
+  "run_time": "08:00"
+}
